@@ -1,116 +1,81 @@
-import { Component } from 'react';
+import { useState, useEffect } from 'react';
 import { GlobalStyle } from './GlobalStyle';
+import { getImagesAPI } from '../services/api';
 
 import { Container } from './App.styled';
 
-import Modal from './Modal/Molal';
-// import * as API from '../services/api';
-import { getImagesAPI } from '../services/api';
-import Button from './Button/Button';
-import Searchbar from './Searchbar/Searchbar';
-import ImageGallery from './ImageGallery/ImageGallery';
-import Loader from './Loader/Loader';
+import { Modal } from './Modal/Molal';
+import { Button } from './Button/Button';
+import { Searchbar } from './Searchbar/Searchbar';
+import { ImageGallery } from './ImageGallery/ImageGallery';
+import { Loader } from './Loader/Loader';
 
-export class App extends Component {
-  state = {
-    page: 1,
-    query: '',
-    items: [],
-    currentLargeImageURL: '',
-    error: null,
-    isLoading: false,
-  };
+export const App = () => {
+  const [page, setPage] = useState(1);
+  const [query, setQuery] = useState('');
+  const [items, setItems] = useState([]);
+  const [currentLargeImageURL, setCurrentLargeImageURL] = useState('');
+  const [error, setError] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
 
-  onOpenModalWithLargeImage = url => {
-    this.setState({
-      currentLargeImageURL: url,
-    });
-  };
+  useEffect(() => {
+    if (query !== '') {
+      addImages(query, page);
+    }
+  }, [query, page]);
 
-  onModalClose = () => {
-    this.setState({
-      currentLargeImageURL: '',
-    });
-  };
-
-  onFormSubmit = query => {
-    if (query.trim().length === 0) {
+  const onFormSubmit = newQuery => {
+    if (newQuery.trim().length === 0) {
       alert('Please, enter request');
       return;
     }
 
-    this.setState({
-      query,
-      page: 1,
-      items: [],
-    });
+    setQuery(newQuery);
+    setPage(1);
+    setItems([]);
   };
 
-  onLoadMoreButton = () => {
-    this.setState(prevState => ({
-      page: prevState.page + 1,
-    }));
-  };
-
-  addImages = async (query, page) => {
+  const addImages = async (query, page) => {
     try {
-      this.setState({
-        isLoading: true,
-      });
-      const images = await getImagesAPI(query, page);
+      setIsLoading(true);
+      const image = await getImagesAPI(query, page);
+      setItems(prevState => [...prevState, ...image]);
+      setIsLoading(false);
 
-      this.setState(prevState => ({
-        items: [...prevState.items, ...images],
-        isLoading: false,
-      }));
-      if (images.length === 0) {
+      if (image.length === 0) {
         alert(
           "Sorry, we can't find anyting for your request. Please, enter another request"
         );
       }
     } catch (error) {
-      this.setState({
-        error: error.message,
-      });
+      setError(error.message);
     } finally {
-      this.setState({
-        isLoading: false,
-      });
+      setIsLoading(false);
     }
   };
 
-  componentDidUpdate(_, prevState) {
-    if (
-      prevState.page !== this.state.page ||
-      prevState.query !== this.state.query
-    ) {
-      this.addImages(this.state.query, this.state.page);
-    }
-  }
+  return (
+    <Container>
+      <Searchbar onSubmit={onFormSubmit} isLoading={isLoading} />
+      {error && <p>{error}</p>}
+      {items.length > 0 && (
+        <ImageGallery items={items} onClick={setCurrentLargeImageURL} />
+      )}
+      {isLoading && <Loader />}
+      {items.length > 0 && (
+        <Button
+          onLoadMore={() => setPage(prev => prev + 1)}
+          isLoading={isLoading}
+        />
+      )}
+      {currentLargeImageURL && (
+        <Modal
+          onCloseModal={() => setCurrentLargeImageURL('')}
+          url={currentLargeImageURL}
+        />
+      )}
 
-  render() {
-    const { items, currentLargeImageURL, isLoading, error } = this.state;
-
-    return (
-      <Container>
-        <Searchbar onSubmit={this.onFormSubmit} isLoading={isLoading} />
-        {error && <p>{error}</p>}
-        {items.length > 0 && (
-          <ImageGallery
-            items={items}
-            onClick={this.onOpenModalWithLargeImage}
-          />
-        )}
-        {isLoading && <Loader />}
-        {items.length > 0 && (
-          <Button onLoadMore={this.onLoadMoreButton} isLoading={isLoading} />
-        )}
-        {currentLargeImageURL && (
-          <Modal onClose={this.onModalClose} url={currentLargeImageURL} />
-        )}
-
-        <GlobalStyle />
-      </Container>
-    );
-  }
-}
+      <GlobalStyle />
+    </Container>
+  );
+};
